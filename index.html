@@ -1,0 +1,172 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Easy Platformer Editor</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background-color: #1a0000;
+      color: #fff;
+    }
+    #editor {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+    #canvasContainer {
+      flex: 1;
+      overflow: auto;
+      background-color: #300000;
+    }
+    canvas {
+      display: block;
+      margin: 0 auto;
+      background-color: #1c1c1c;
+    }
+    #toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 10px;
+      background-color: #2e0000;
+      gap: 5px;
+    }
+    button, input[type="file"] {
+      padding: 5px;
+      background-color: #660000;
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+    }
+    #library {
+      display: flex;
+      overflow-x: auto;
+      gap: 5px;
+      padding: 10px;
+      background-color: #1c0000;
+    }
+    #library img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      cursor: pointer;
+      border: 2px solid transparent;
+    }
+    #library img.selected {
+      border-color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div id="editor">
+    <div id="toolbar">
+      <input type="file" id="uploadImage" accept="image/*" />
+      <button onclick="zoomOut()">-</button>
+      <button onclick="zoomIn()">+</button>
+      <button onclick="addRow()">Add Row</button>
+      <button onclick="addCol()">Add Column</button>
+      <button onclick="downloadHTML()">Export Game</button>
+    </div>
+    <div id="library"></div>
+    <div id="canvasContainer">
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+    </div>
+  </div>  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    let scale = 40;
+    let rows = 15;
+    let cols = 20;
+    const map = Array.from({ length: rows }, () => Array(cols).fill(null));
+    const images = [];
+    let selectedImage = null;
+
+    document.getElementById('uploadImage').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const img = new Image();
+        img.onload = () => {
+          images.push(img);
+          updateLibrary();
+        };
+        img.src = URL.createObjectURL(file);
+      }
+    });
+
+    function updateLibrary() {
+      const library = document.getElementById('library');
+      library.innerHTML = '';
+      images.forEach((img, i) => {
+        const thumb = document.createElement('img');
+        thumb.src = img.src;
+        thumb.onclick = () => {
+          document.querySelectorAll('#library img').forEach(el => el.classList.remove('selected'));
+          thumb.classList.add('selected');
+          selectedImage = img;
+        };
+        library.appendChild(thumb);
+      });
+    }
+
+    canvas.addEventListener('click', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / scale);
+      const y = Math.floor((e.clientY - rect.top) / scale);
+      if (x < cols && y < rows) {
+        map[y][x] = selectedImage;
+        drawMap();
+      }
+    });
+
+    function drawMap() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const img = map[y][x];
+          if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
+          ctx.strokeStyle = '#333';
+          ctx.strokeRect(x * scale, y * scale, scale, scale);
+        }
+      }
+    }
+
+    function zoomIn() {
+      scale += 5;
+      drawMap();
+    }
+
+    function zoomOut() {
+      scale = Math.max(10, scale - 5);
+      drawMap();
+    }
+
+    function addRow() {
+      map.push(Array(cols).fill(null));
+      rows++;
+      canvas.height = rows * scale;
+      drawMap();
+    }
+
+    function addCol() {
+      map.forEach(row => row.push(null));
+      cols++;
+      canvas.width = cols * scale;
+      drawMap();
+    }
+
+    function downloadHTML() {
+      let gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>const c=document.getElementById('c');const ctx=c.getContext('2d');c.width=${cols*scale};c.height=${rows*scale};const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};const imagesSrc=${JSON.stringify(images.map(img => img.src))};const images=[];let loaded=0;for(let i=0;i<imagesSrc.length;i++){const img=new Image();img.src=imagesSrc[i];img.onload=()=>{loaded++;if(loaded===imagesSrc.length)start()};images.push(img);}function start(){for(let y=0;y<map.length;y++){for(let x=0;x<map[y].length;x++){const id=map[y][x];if(id!==-1){ctx.drawImage(images[id],x*${scale},y*${scale},${scale},${scale});}}}}<\/script></body></html>`;const blob = new Blob([gameHTML], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'platformer_test.html';
+  a.click();
+}
+
+drawMap();
+
+  </script>
+</body>
+</html>
