@@ -1,12 +1,9 @@
-<!DOCTYPE html><html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dynamic Rise™ Game Engine (2D Edition)</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: sans-serif;
@@ -92,6 +89,7 @@
     </div>
   </div>
   <script>
+    // Core canvas and game state setup
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     let scale = 40;
@@ -101,7 +99,8 @@
     const images = [];
     let selectedImage = null;
     let playMode = false;
-    let player = { x: 1, y: 1 };document.getElementById('uploadImage').addEventListener('change', (e) => {
+    let player = { x: 1, y: 1, speed: 1 };// Handle image uploading
+document.getElementById('uploadImage').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (file) {
     const img = new Image();
@@ -116,7 +115,7 @@
 function updateLibrary() {
   const library = document.getElementById('library');
   library.innerHTML = '';
-  images.forEach((img, i) => {
+  images.forEach((img) => {
     const thumb = document.createElement('img');
     thumb.src = img.src;
     thumb.onclick = () => {
@@ -170,10 +169,12 @@ function togglePlay() {
 }
 
 function movePlayer(e) {
-  if (e.key === 'ArrowLeft') player.x = Math.max(0, player.x - 1);
-  if (e.key === 'ArrowRight') player.x = Math.min(cols - 1, player.x + 1);
-  if (e.key === 'ArrowUp') player.y = Math.max(0, player.y - 1);
-  if (e.key === 'ArrowDown') player.y = Math.min(rows - 1, player.y + 1);
+  switch (e.key) {
+    case 'ArrowLeft': player.x = Math.max(0, player.x - player.speed); break;
+    case 'ArrowRight': player.x = Math.min(cols - 1, player.x + player.speed); break;
+    case 'ArrowUp': player.y = Math.max(0, player.y - player.speed); break;
+    case 'ArrowDown': player.y = Math.min(rows - 1, player.y + player.speed); break;
+  }
   drawMap();
 }
 
@@ -206,7 +207,7 @@ function addCol() {
 }
 
 function downloadHTML() {
-  const gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>const c=document.getElementById('c');const ctx=c.getContext('2d');c.width=${cols * scale};c.height=${rows * scale};const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};const imagesSrc=${JSON.stringify(images.map(img => img.src))};const images=[];let loaded=0;let player={x:1,y:1};for(let i=0;i<imagesSrc.length;i++){const img=new Image();img.src=imagesSrc[i];img.onload=()=>{loaded++;if(loaded===imagesSrc.length)start();};images.push(img);}function start(){draw();window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')player.x=Math.max(0,player.x-1);if(e.key==='ArrowRight')player.x=Math.min(${cols}-1,player.x+1);if(e.key==='ArrowUp')player.y=Math.max(0,player.y-1);if(e.key==='ArrowDown')player.y=Math.min(${rows}-1,player.y+1);draw();});}function draw(){ctx.clearRect(0,0,c.width,c.height);for(let y=0;y<map.length;y++){for(let x=0;x<map[y].length;x++){let id=map[y][x];if(id!==-1){ctx.drawImage(images[id],x*${scale},y*${scale},${scale},${scale});ctx.strokeStyle='#333';ctx.strokeRect(x*${scale},y*${scale},${scale},${scale});}}ctx.fillStyle='lime';ctx.fillRect(player.x*${scale}+10,player.y*${scale}+10,${scale}-20,${scale}-20);}<\/script></body></html>`;
+  const gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>const c=document.getElementById('c');const ctx=c.getContext('2d');c.width=${cols * scale};c.height=${rows * scale};const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};const imagesSrc=${JSON.stringify(images.map(img => img.src))};const images=[];let loaded=0;let player={x:1,y:1};for(let i=0;i<imagesSrc.length;i++){const img=new Image();img.src=imagesSrc[i];img.onload=()=>{loaded++;if(loaded===imagesSrc.length)start();};images.push(img);}function start(){draw();window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')player.x=Math.max(0,player.x-1);if(e.key==='ArrowRight')player.x=Math.min(${cols}-1,player.x+1);if(e.key==='ArrowUp')player.y=Math.max(0,player.y-1);if(e.key==='ArrowDown')player.y=Math.min(${rows}-1,player.y+1);draw();});}function draw(){ctx.clearRect(0,0,c.width,c.height);for(let y=0;y<map.length;y++){for(let x=0;x<map[y].length;x++){let id=map[y][x];if(id!==-1){ctx.drawImage(images[id],x*${scale},y*${scale},${scale},${scale});ctx.strokeStyle='#333';ctx.strokeRect(x*${scale},y*${scale},${scale},${scale});}}ctx.fillStyle='lime';ctx.fillRect(player.x*${scale}+10,player.y*${scale}+10,${scale}-20,${scale}-20);}</script></body></html>`;
   const blob = new Blob([gameHTML], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
