@@ -2,28 +2,22 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Easy Platformer Editor</title>
+  <title>Dynamic Rise™ Game Engine (2D Edition)</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
       margin: 0;
       font-family: sans-serif;
       background-color: #1a0000;
       color: #fff;
+      overflow: hidden;
     }
     #editor {
       display: flex;
       flex-direction: column;
       height: 100vh;
-    }
-    #canvasContainer {
-      flex: 1;
-      overflow: auto;
-      background-color: #300000;
-    }
-    canvas {
-      display: block;
-      margin: 0 auto;
-      background-color: #1c1c1c;
     }
     #toolbar {
       display: flex;
@@ -33,12 +27,24 @@
       background-color: #2e0000;
       gap: 5px;
     }
+    #canvasContainer {
+      flex: 1;
+      position: relative;
+      background-color: #300000;
+    }
+    canvas {
+      display: block;
+      margin: auto;
+      background-color: #1c1c1c;
+      image-rendering: pixelated;
+    }
     button, input[type="file"] {
       padding: 5px;
       background-color: #660000;
       border: none;
       border-radius: 4px;
       color: #fff;
+      cursor: pointer;
     }
     #library {
       display: flex;
@@ -57,6 +63,15 @@
     #library img.selected {
       border-color: #fff;
     }
+    #uiOverlay {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 5px;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -68,12 +83,15 @@
       <button onclick="addRow()">Add Row</button>
       <button onclick="addCol()">Add Column</button>
       <button onclick="downloadHTML()">Export Game</button>
+      <button onclick="togglePlay()">▶ Play Mode</button>
     </div>
     <div id="library"></div>
     <div id="canvasContainer">
       <canvas id="gameCanvas" width="800" height="600"></canvas>
+      <div id="uiOverlay">Use tools to edit map. Play mode will simulate camera follow and controls.</div>
     </div>
-  </div>  <script>
+  </div>
+  <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     let scale = 40;
@@ -82,82 +100,114 @@
     const map = Array.from({ length: rows }, () => Array(cols).fill(null));
     const images = [];
     let selectedImage = null;
+    let playMode = false;
+    let player = { x: 1, y: 1 };document.getElementById('uploadImage').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const img = new Image();
+    img.onload = () => {
+      images.push(img);
+      updateLibrary();
+    };
+    img.src = URL.createObjectURL(file);
+  }
+});
 
-    document.getElementById('uploadImage').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const img = new Image();
-        img.onload = () => {
-          images.push(img);
-          updateLibrary();
-        };
-        img.src = URL.createObjectURL(file);
-      }
-    });
+function updateLibrary() {
+  const library = document.getElementById('library');
+  library.innerHTML = '';
+  images.forEach((img, i) => {
+    const thumb = document.createElement('img');
+    thumb.src = img.src;
+    thumb.onclick = () => {
+      document.querySelectorAll('#library img').forEach(el => el.classList.remove('selected'));
+      thumb.classList.add('selected');
+      selectedImage = img;
+    };
+    library.appendChild(thumb);
+  });
+}
 
-    function updateLibrary() {
-      const library = document.getElementById('library');
-      library.innerHTML = '';
-      images.forEach((img, i) => {
-        const thumb = document.createElement('img');
-        thumb.src = img.src;
-        thumb.onclick = () => {
-          document.querySelectorAll('#library img').forEach(el => el.classList.remove('selected'));
-          thumb.classList.add('selected');
-          selectedImage = img;
-        };
-        library.appendChild(thumb);
-      });
+canvas.addEventListener('click', (e) => {
+  if (playMode) return;
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / scale);
+  const y = Math.floor((e.clientY - rect.top) / scale);
+  if (x < cols && y < rows) {
+    map[y][x] = selectedImage;
+    drawMap();
+  }
+});
+
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const img = map[y][x];
+      if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
+      ctx.strokeStyle = '#333';
+      ctx.strokeRect(x * scale, y * scale, scale, scale);
     }
+  }
+  if (playMode) drawPlayer();
+}
 
-    canvas.addEventListener('click', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / scale);
-      const y = Math.floor((e.clientY - rect.top) / scale);
-      if (x < cols && y < rows) {
-        map[y][x] = selectedImage;
-        drawMap();
-      }
-    });
+function drawPlayer() {
+  ctx.fillStyle = 'lime';
+  ctx.fillRect(player.x * scale + 10, player.y * scale + 10, scale - 20, scale - 20);
+}
 
-    function drawMap() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const img = map[y][x];
-          if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
-          ctx.strokeStyle = '#333';
-          ctx.strokeRect(x * scale, y * scale, scale, scale);
-        }
-      }
-    }
+function togglePlay() {
+  playMode = !playMode;
+  if (playMode) {
+    document.getElementById('uiOverlay').textContent = 'Play Mode: Use arrow keys to move';
+    window.addEventListener('keydown', movePlayer);
+  } else {
+    document.getElementById('uiOverlay').textContent = 'Use tools to edit map. Play mode will simulate camera follow and controls.';
+    window.removeEventListener('keydown', movePlayer);
+  }
+  drawMap();
+}
 
-    function zoomIn() {
-      scale += 5;
-      drawMap();
-    }
+function movePlayer(e) {
+  if (e.key === 'ArrowLeft') player.x = Math.max(0, player.x - 1);
+  if (e.key === 'ArrowRight') player.x = Math.min(cols - 1, player.x + 1);
+  if (e.key === 'ArrowUp') player.y = Math.max(0, player.y - 1);
+  if (e.key === 'ArrowDown') player.y = Math.min(rows - 1, player.y + 1);
+  drawMap();
+}
 
-    function zoomOut() {
-      scale = Math.max(10, scale - 5);
-      drawMap();
-    }
+function zoomIn() {
+  scale += 5;
+  canvas.width = cols * scale;
+  canvas.height = rows * scale;
+  drawMap();
+}
 
-    function addRow() {
-      map.push(Array(cols).fill(null));
-      rows++;
-      canvas.height = rows * scale;
-      drawMap();
-    }
+function zoomOut() {
+  scale = Math.max(10, scale - 5);
+  canvas.width = cols * scale;
+  canvas.height = rows * scale;
+  drawMap();
+}
 
-    function addCol() {
-      map.forEach(row => row.push(null));
-      cols++;
-      canvas.width = cols * scale;
-      drawMap();
-    }
+function addRow() {
+  map.push(Array(cols).fill(null));
+  rows++;
+  canvas.height = rows * scale;
+  drawMap();
+}
 
-    function downloadHTML() {
-      let gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>const c=document.getElementById('c');const ctx=c.getContext('2d');c.width=${cols*scale};c.height=${rows*scale};const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};const imagesSrc=${JSON.stringify(images.map(img => img.src))};const images=[];let loaded=0;for(let i=0;i<imagesSrc.length;i++){const img=new Image();img.src=imagesSrc[i];img.onload=()=>{loaded++;if(loaded===imagesSrc.length)start()};images.push(img);}function start(){for(let y=0;y<map.length;y++){for(let x=0;x<map[y].length;x++){const id=map[y][x];if(id!==-1){ctx.drawImage(images[id],x*${scale},y*${scale},${scale},${scale});}}}}<\/script></body></html>`;const blob = new Blob([gameHTML], { type: 'text/html' });
+function addCol() {
+  map.forEach(row => row.push(null));
+  cols++;
+  canvas.width = cols * scale;
+  drawMap();
+}
+
+function downloadHTML() {
+  const gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>const c=document.getElementById('c');const ctx=c.getContext('2d');c.width=${cols * scale};c.height=${rows * scale};const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};const imagesSrc=${JSON.stringify(images.map(img => img.src))};const images=[];let loaded=0;let player={x:1,y:1};for(let i=0;i<imagesSrc.length;i++){const img=new Image();img.src=imagesSrc[i];img.onload=()=>{loaded++;if(loaded===imagesSrc.length)start();};images.push(img);}function start(){draw();window.addEventListener('keydown',e=>{if(e.key==='ArrowLeft')player.x=Math.max(0,player.x-1);if(e.key==='ArrowRight')player.x=Math.min(${cols}-1,player.x+1);if(e.key==='ArrowUp')player.y=Math.max(0,player.y-1);if(e.key==='ArrowDown')player.y=Math.min(${rows}-1,player.y+1);draw();});}function draw(){ctx.clearRect(0,0,c.width,c.height);for(let y=0;y<map.length;y++){for(let x=0;x<map[y].length;x++){let id=map[y][x];if(id!==-1){ctx.drawImage(images[id],x*${scale},y*${scale},${scale},${scale});ctx.strokeStyle='#333';ctx.strokeRect(x*${scale},y*${scale},${scale},${scale});}}ctx.fillStyle='lime';ctx.fillRect(player.x*${scale}+10,player.y*${scale}+10,${scale}-20,${scale}-20);}<\/script></body></html>`;
+  const blob = new Blob([gameHTML], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
