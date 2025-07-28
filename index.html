@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic Rise™ Game Engine (2D Edition)</title>
+  <title>Dynamic Rise™ Game Engine (2D Edition</title>
   <style>
     body {
       margin: 0;
@@ -87,6 +87,10 @@
       background: red;
       z-index: 9999;
     }
+  
+    #toolbar button.selected {
+     background-color: #ff3333;
+    }
   </style>
 </head>
 <body>
@@ -98,8 +102,8 @@
       <button onclick="addRow()">Add Row</button>
       <button onclick="addCol()">Add Column</button>
       <button onclick="downloadHTML()">Export Game</button>
-      <button onclick="mode = 'place'">Place</button>
-      <button onclick="mode = 'remove'">Remove</button>
+      <button id="placeBtn" onclick="setMode('place')">Place</button>  
+      <button id="removeBtn" onclick="setMode('remove')">Remove</button>
       <button onclick="saveMap()">Save</button>
       <button onclick="loadMap()">Load</button>
     </div>
@@ -110,6 +114,19 @@
     <div id="player"></div>
     <div id="joystick">
     <div id="joystick-inner"></div>
+    <button id="jumpBtn" style="
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 18px;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 1000;
+  ">JUMP</button>
    </div>
   </div>
 
@@ -135,6 +152,12 @@
         img.src = URL.createObjectURL(file);
       }
     });
+  
+  function setMode(m) {
+  mode = m;
+  document.getElementById("placeBtn").classList.toggle("selected", mode === "place");
+  document.getElementById("removeBtn").classList.toggle("selected", mode === "remove");
+}
 
     function updateLibrary() {
       const library = document.getElementById('library');
@@ -208,7 +231,7 @@ const ctx=c.getContext('2d');
 c.width=${cols * scale};
 c.height=${rows * scale};
 
-const map=${JSON.stringify(map.map(row => row.map(cell => images.indexOf(cell))))};
+const map=${JSON.stringify(map.map(row => row.map(cell => cell ? images.indexOf(cell) : null)))};
 const imagesSrc=${JSON.stringify(images.map(img => img.src))};
 
 const blockSize=${scale};
@@ -232,8 +255,8 @@ function start(){
   for(let y=0; y<map.length; y++){
     for(let x=0; x<map[y].length; x++){
       const id=map[y][x];
-      if(id!==-1){
-        ctx.drawImage(images[id], x*blockSize, y*blockSize, blockSize, blockSize);
+      if (id !== null) {
+  ctx.drawImage(images[id], x * blockSize, y * blockSize, blockSize, blockSize);
       }
     }
   }
@@ -262,22 +285,66 @@ function start(){
 }
   
   function saveMap() {
+  const name = prompt("Enter project name:", "my-project");
+  if (!name) return;
+
   const serializableMap = map.map(row =>
     row.map(cell => cell ? images.indexOf(cell) : null)
   );
-  localStorage.setItem('platformerMap', JSON.stringify(serializableMap));
-  alert('Map saved!');
+
+  const project = {
+    map: serializableMap,
+    imageSrcs: images.map(img => img.src),
+    scale,
+    rows,
+    cols
+  };
+
+  const blob = new Blob([JSON.stringify(project)], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.drge2d`;
+  a.click();
 }
 
 function loadMap() {
-  const saved = localStorage.getItem('platformerMap');
-  if (saved) {
-    const loadedMap = JSON.parse(saved);
-    for (let y = 0; y < loadedMap.length; y++) {
-      for (let x = 0; x < loadedMap[y].length; x++) {
-        const imgIndex = loadedMap[y][x];
-        map[y][x] = imgIndex !== null ? images[imgIndex] : null;
-      }
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".drge2d";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = JSON.parse(reader.result);
+      rows = data.rows;
+      cols = data.cols;
+      scale = data.scale;
+      canvas.width = cols * scale;
+      canvas.height = rows * scale;
+
+      images.length = 0;
+      let loaded = 0;
+      data.imageSrcs.forEach(src => {
+        const img = new Image();
+        img.onload = () => {
+          loaded++;
+          if (loaded === data.imageSrcs.length) {
+            map.length = 0;
+            data.map.forEach(row => {
+              map.push(row.map(id => id !== null ? images[id] : null));
+            });
+            drawMap();
+          }
+        };
+        img.src = src;
+        images.push(img);
+      });
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
     }
     drawMap();
     alert('Map loaded!');
@@ -372,6 +439,26 @@ function updatePlayer() {
   player.style.left = newX + 'px';
   player.style.top = newY + 'px';
 }
+  
+  // Clamp player within the canvas
+newX = Math.max(0, Math.min(newX, canvas.width - player.offsetWidth));
+newY = Math.max(0, Math.min(newY, canvas.height - player.offsetHeight));
+
+// Tile collision
+const playerMidX = newX + player.offsetWidth / 2;
+const playerMidY = newY + player.offsetHeight;
+
+if (isColliding(playerMidX, playerMidY)) {
+  newY = player.offsetTop; // Stop falling
+  velocityY = 0;
+  onGround = true;
+}
+  
+  document.getElementById("jumpBtn").addEventListener("touchstart", () => {
+  if (onGround) {
+    isJumping = true;
+  }
+});
 
 // Game Loop
 function gameLoop() {
