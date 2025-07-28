@@ -1,9 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dynamic Rise™ Game Engine (2D Edition</title>
+  <title>Dynamic Rise™ Game Engine (2D Edition)</title>
   <style>
     body {
       margin: 0;
@@ -15,15 +14,16 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
+      overflow: hidden;
     }
     #canvasContainer {
       flex: 1;
       overflow: auto;
       background-color: #300000;
+      position: relative;
     }
     canvas {
       display: block;
-      margin: 0 auto;
       background-color: #1c1c1c;
     }
     #toolbar {
@@ -58,7 +58,6 @@
     #library img.selected {
       border-color: #fff;
     }
-  
     #joystick {
       position: absolute;
       bottom: 20px;
@@ -71,25 +70,36 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      z-index: 10;
     }
-
     #joystick-inner {
       width: 60px;
       height: 60px;
       background: rgba(255, 255, 255, 0.5);
       border-radius: 50%;
     }
-
+    #jumpBtn {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 18px;
+      border-radius: 50%;
+      border: 2px solid white;
+      z-index: 10;
+    }
     #player {
       position: absolute;
       width: 30px;
       height: 30px;
       background: red;
-      z-index: 9999;
+      z-index: 5;
     }
-  
     #toolbar button.selected {
-     background-color: #ff3333;
+      background-color: #ff3333;
     }
   </style>
 </head>
@@ -102,7 +112,7 @@
       <button onclick="addRow()">Add Row</button>
       <button onclick="addCol()">Add Column</button>
       <button onclick="downloadHTML()">Export Game</button>
-      <button id="placeBtn" onclick="setMode('place')">Place</button>  
+      <button id="placeBtn" onclick="setMode('place')">Place</button>
       <button id="removeBtn" onclick="setMode('remove')">Remove</button>
       <button onclick="saveMap()">Save</button>
       <button onclick="loadMap()">Load</button>
@@ -110,26 +120,13 @@
     <div id="library"></div>
     <div id="canvasContainer">
       <canvas id="gameCanvas" width="800" height="600"></canvas>
+      <div id="player"></div>
+      <div id="joystick">
+        <div id="joystick-inner"></div>
+      </div>
+      <button id="jumpBtn">JUMP</button>
     </div>
-    <div id="player"></div>
-    <div id="joystick">
-    <div id="joystick-inner"></div>
-    <button id="jumpBtn" style="
-  position: absolute;
-  bottom: 20px;
-  right: 20px;
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 18px;
-  border-radius: 50%;
-  border: 2px solid white;
-  z-index: 1000;
-  ">JUMP</button>
-   </div>
   </div>
-
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
