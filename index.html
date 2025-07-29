@@ -14,18 +14,15 @@
       display: flex;
       flex-direction: column;
       height: 100vh;
-      overflow: hidden;
     }
     #canvasContainer {
-  flex: 1;
-  overflow: auto;
-  background-color: #300000;
-  position: relative;
-  width: 100%;
-  height: 100%;
-}
+      flex: 1;
+      overflow: auto;
+      background-color: #300000;
+    }
     canvas {
       display: block;
+      margin: 0 auto;
       background-color: #1c1c1c;
     }
     #toolbar {
@@ -60,6 +57,7 @@
     #library img.selected {
       border-color: #fff;
     }
+  
     #joystick {
       position: absolute;
       bottom: 20px;
@@ -72,42 +70,26 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      z-index: 10;
     }
+
     #joystick-inner {
       width: 60px;
       height: 60px;
       background: rgba(255, 255, 255, 0.5);
       border-radius: 50%;
     }
-    #jumpBtn {
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      width: 80px;
-      height: 80px;
-      background: rgba(255, 255, 255, 0.2);
-      color: white;
-      font-size: 18px;
-      border-radius: 50%;
-      border: 2px solid white;
-      z-index: 10;
-    }
+
     #player {
       position: absolute;
       width: 30px;
       height: 30px;
       background: red;
-      z-index: 5;
-    }
-    #toolbar button.selected {
-      background-color: #ff3333;
+      z-index: 9999;
     }
   
-    .tool-button.selected {
-  border: 2px solid orange;
-  background-color: #333;
-}
+    #toolbar button.selected {
+     background-color: #ff3333;
+    }
   </style>
 </head>
 <body>
@@ -119,255 +101,44 @@
       <button onclick="addRow()">Add Row</button>
       <button onclick="addCol()">Add Column</button>
       <button onclick="downloadHTML()">Export Game</button>
-      <button id="place" class="tool-button" onclick="selectTool('place')">Place</button>
-      <button id="remove" class="tool-button" onclick="selectTool('remove')">Remove</button>
-      <button onclick="saveProject()">Save</button>
-      <button onclick="loadProject()">Load</button>
+      <button id="placeBtn" onclick="setMode('place')">Place</button>  
+      <button id="removeBtn" onclick="setMode('remove')">Remove</button>
+      <button onclick="saveMap()">Save</button>
+      <button onclick="loadMap()">Load</button>
     </div>
     <div id="library"></div>
     <div id="canvasContainer">
       <canvas id="gameCanvas" width="800" height="600"></canvas>
-      <div id="player"></div>
-      <div id="joystick">
-        <div id="joystick-inner"></div>
-      </div>
-      <button id="jumpBtn" style="position:fixed;bottom:80px;right:20px;">Jump</button>
     </div>
+    <div id="player"></div>
+    <div id="joystick">
+    <div id="joystick-inner"></div>
+    <button id="jumpBtn" style="
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 18px;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 1000;
+  ">JUMP</button>
+   </div>
   </div>
+
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     let scale = 40;
     let rows = 15;
     let cols = 20;
-    const map = Array.from({ length: rows }, () => Array(cols).fill(null));
+    let map = Array.from({ length: rows }, () => Array(cols).fill(null));
     const images = [];
     let selectedImage = null;
-    let mode = 'place';
-
-    document.getElementById('uploadImage').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const img = new Image();
-        img.onload = () => {
-          images.push(img);
-          updateLibrary();
-        };
-        img.src = URL.createObjectURL(file);
-      }
-    });
-  
-  function setMode(m) {
-  mode = m;
-  document.getElementById("placeBtn").classList.toggle("selected", mode === "place");
-  document.getElementById("removeBtn").classList.toggle("selected", mode === "remove");
-}
-
-    function updateLibrary() {
-      const library = document.getElementById('library');
-      library.innerHTML = '';
-      images.forEach((img, i) => {
-        const thumb = document.createElement('img');
-        thumb.src = img.src;
-        thumb.onclick = () => {
-          document.querySelectorAll('#library img').forEach(el => el.classList.remove('selected'));
-          thumb.classList.add('selected');
-          selectedImage = img;
-        };
-        library.appendChild(thumb);
-      });
-    }
-
-    canvas.addEventListener('click', (e) => {
-  const rect = canvas.getBoundingClientRect();
-  const x = Math.floor((e.clientX - rect.left) / scale);
-  const y = Math.floor((e.clientY - rect.top) / scale);
-  if (x < cols && y < rows) {
-    if (mode === 'place') {
-      map[y][x] = selectedImage;
-    } else if (mode === 'remove') {
-      map[y][x] = null;
-    }
-    drawMap();
-  }
-});
-
-    function drawMap() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const img = map[y][x];
-          if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
-          ctx.strokeStyle = '#333';
-          ctx.strokeRect(x * scale, y * scale, scale, scale);
-        }
-      }
-    }
-
-    function zoomIn() {
-      scale += 5;
-      drawMap();
-    }
-
-    function zoomOut() {
-      scale = Math.max(10, scale - 5);
-      drawMap();
-    }
-
-    function addRow() {
-      map.push(Array(cols).fill(null));
-      rows++;
-      canvas.height = rows * scale;
-      drawMap();
-    }
-
-    function addCol() {
-      map.forEach(row => row.push(null));
-      cols++;
-      canvas.width = cols * scale;
-      drawMap();
-    }
-
-    function downloadHTML() {
-  let gameHTML = `<!DOCTYPE html><html><head><title>Platformer Game</title><style>canvas{background:#111;display:block;margin:auto;}</style></head><body><canvas id='c'></canvas><script>
-const c=document.getElementById('c');
-const ctx=c.getContext('2d');
-c.width=${cols * scale};
-c.height=${rows * scale};
-
-const map=${JSON.stringify(map.map(row => row.map(cell => cell ? images.indexOf(cell) : null)))};
-const imagesSrc=${JSON.stringify(images.map(img => img.src.startsWith("blob:") ? img.src : img.src))};
-
-const blockSize=${scale};
-const images=[];
-let loaded=0;
-
-for(let i=0;i<imagesSrc.length;i++){
-  const img=new Image();
-  img.src=imagesSrc[i];
-  img.onload=()=>{ loaded++; if(loaded===imagesSrc.length) start(); };
-  images.push(img);
-}
-
-function isColliding(x, y){
-  const col = Math.floor(x / blockSize);
-  const row = Math.floor(y / blockSize);
-  return map[row] && map[row][col] !== -1;
-}
-
-function start(){
-  for(let y=0; y<map.length; y++){
-    for(let x=0; x<map[y].length; x++){
-      const id=map[y][x];
-      if (id !== null) {
-  ctx.drawImage(images[id], x * blockSize, y * blockSize, blockSize, blockSize);
-      }
-    }
-  }
-
-  // Basic player example
-  ctx.fillStyle = "red";
-  ctx.fillRect(50, 50, 30, 30); // You can expand this with player physics
-}
-<\/script></body></html>`;
-
-  const blob = new Blob([gameHTML], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'platformer_test.html';
-  a.click();
-}
-
-    drawMap();
-  
-  function isColliding(x, y) {
-  const col = Math.floor(x / scale);
-  const row = Math.floor(y / scale);
-  if (row < 0 || row >= map.length || col < 0 || col >= map[0].length) return false;
-  return map[row][col] !== null;
-}
-  
-  function saveMap() {
-  const name = prompt("Enter project name:", "my-project");
-  if (!name) return;
-
-  const serializableMap = map.map(row =>
-    row.map(cell => cell ? images.indexOf(cell) : null)
-  );
-
-  const project = {
-  map: serializableMap,
-  imageSrcs: images.map(img => img.src),
-  scale,
-  rows,
-  cols,
-  player: {
-    left: player.style.left,
-    top: player.style.top
-  }
-};
-
-  const blob = new Blob([JSON.stringify(project)], { type: "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.drge2d`;
-  a.click();
-}
-
-function loadMap() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".drge2d";
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const data = JSON.parse(reader.result);
-      rows = data.rows;
-      cols = data.cols;
-      scale = data.scale;
-      canvas.width = cols * scale;
-      canvas.height = rows * scale;
-
-      images.length = 0;
-      let loaded = 0;
-      data.imageSrcs.forEach(src => {
-        const img = new Image();
-        img.onload = () => {
-          loaded++;
-          if (loaded === data.imageSrcs.length) {
-            map.length = 0;
-            data.map.forEach(row => {
-              map.push(row.map(id => id !== null ? images[id] : null));
-            });
-            drawMap();
-            
-            if (data.player) {
-  player.style.left = data.player.left;
-  player.style.top = data.player.top;
-}
-            
-          }
-        };
-        img.src = src;
-        images.push(img);
-      });
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
-    }
-    drawMap();
-    alert('Map loaded!');
-  } else {
-    alert('No saved map found.');
-  }
-}
-  
-     const player = document.getElementById('player');
+    let mode = 'place';const player = document.getElementById('player');
 let velocityX = 0, velocityY = 0;
 let isJumping = false;
 let gravity = 1;
@@ -375,54 +146,57 @@ let onGround = false;
 
 const joystick = document.getElementById("joystick");
 const joystickInner = document.getElementById("joystick-inner");
-
 let joyPos = { x: 0, y: 0 };
 let joystickActive = false;
-
-joystick.addEventListener("touchstart", e => {
-  joystickActive = true;
-}, false);
-
-joystick.addEventListener("touchmove", e => {
-  e.preventDefault();
-  const touch = e.touches[0];
-  const rect = joystick.getBoundingClientRect();
-  const dx = touch.clientX - rect.left - rect.width / 2;
-  const dy = touch.clientY - rect.top - rect.height / 2;
-
-  joyPos.x = dx / 30;
-  joyPos.y = dy / 30;
-
-  joystickInner.style.transform = `translate(${dx}px, ${dy}px)`;
-}, false);
-
-joystick.addEventListener("touchend", () => {
-  joystickActive = false;
-  joyPos = { x: 0, y: 0 };
-  joystickInner.style.transform = "translate(0, 0)";
-}, false);
-
-// Keyboard Controls
 let keys = {};
-document.addEventListener('keydown', (e) => keys[e.key] = true);
-document.addEventListener('keyup', (e) => keys[e.key] = false);
-
-// Gamepad Support
 let gamepadIndex = null;
-window.addEventListener("gamepadconnected", (e) => {
-  gamepadIndex = e.gamepad.index;
-});
 
-function getGamepadInput() {
-  const gp = navigator.getGamepads()[gamepadIndex];
-  if (!gp) return;
-  joyPos.x = gp.axes[0];
-  if (gp.buttons[0].pressed && onGround) isJumping = true;
+function updateLibrary() {
+  const library = document.getElementById('library');
+  library.innerHTML = '';
+  images.forEach((img, i) => {
+    const thumb = document.createElement('img');
+    thumb.src = img.src;
+    thumb.onclick = () => {
+      document.querySelectorAll('#library img').forEach(el => el.classList.remove('selected'));
+      thumb.classList.add('selected');
+      selectedImage = img;
+    };
+    library.appendChild(thumb);
+  });
 }
 
-// Movement & Collision Update
+document.getElementById('uploadImage').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    const img = new Image();
+    img.onload = () => {
+      images.push(img);
+      updateLibrary();
+    };
+    img.src = URL.createObjectURL(file);
+  }
+});
+
+function drawMap() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const img = map[y][x];
+      if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
+      ctx.strokeStyle = '#333';
+      ctx.strokeRect(x * scale, y * scale, scale, scale);
+    }
+  }
+}
+
+function isColliding(x, y) {
+  const col = Math.floor(x / scale);
+  const row = Math.floor(y / scale);
+  return map[row] && map[row][col] !== null;
+}
+
 function updatePlayer() {
-  // Apply joystick or keyboard movement
   let moveX = joyPos.x || (keys['ArrowRight'] || keys['d'] ? 1 : keys['ArrowLeft'] || keys['a'] ? -1 : 0);
   velocityX = moveX * 4;
 
@@ -436,14 +210,11 @@ function updatePlayer() {
     onGround = false;
   }
 
-  // Gravity
   velocityY += gravity;
 
-  // Predict new positions
   let newX = player.offsetLeft + velocityX;
   let newY = player.offsetTop + velocityY;
 
-  // Collision check bottom of player
   const playerMidX = newX + player.offsetWidth / 2;
   const playerBottomY = newY + player.offsetHeight;
 
@@ -455,146 +226,80 @@ function updatePlayer() {
     onGround = false;
   }
 
-  // Keep player inside canvas
   newX = Math.max(0, Math.min(canvas.width - player.offsetWidth, newX));
   newY = Math.max(0, Math.min(canvas.height - player.offsetHeight, newY));
 
   player.style.left = newX + 'px';
   player.style.top = newY + 'px';
 }
-  
-  // Clamp player within the canvas
-player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
-player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 
-// Tile collision
-const playerMidX = newX + player.offsetWidth / 2;
-const playerMidY = newY + player.offsetHeight;
-
-if (isColliding(playerMidX, playerMidY)) {
-  newY = player.offsetTop; // Stop falling
-  velocityY = 0;
-  onGround = true;
-}
-  
-  document.getElementById("jumpBtn").addEventListener("click", () => {
-  if (player.onGround) {
-    player.vy = -10;
-    player.onGround = false;
-  }
-});
-  
-  function checkCollision(x, y) {
-  for (let block of blocks) {
-    if (
-      x < block.x + block.size &&
-      x + player.width > block.x &&
-      y < block.y + block.size &&
-      y + player.height > block.y
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
-  
-  function saveProject() {
-  let name = prompt("Enter project name:");
-  if (!name) return;
-
-  const serializableMap = map.map(row =>
-    row.map(cell => cell ? images.indexOf(cell) : null)
-  );
-
-  const project = {
-    map: serializableMap,
-    imageSrcs: images.map(img => img.src),
-    scale,
-    rows,
-    cols,
-    player: {
-      left: player.style.left,
-      top: player.style.top
-    }
-  };
-
-  const blob = new Blob([JSON.stringify(project)], { type: "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.drge2d`;
-  a.click();
-}
-  
-  function loadProject() {
-  const input = document.createElement("input");
-  input.type = "file";
-  input.accept = ".drge2d";
-  input.onchange = (e) => {
-    const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = () => {
-      const data = JSON.parse(reader.result);
-
-      rows = data.rows;
-      cols = data.cols;
-      scale = data.scale;
-      canvas.width = cols * scale;
-      canvas.height = rows * scale;
-
-      images.length = 0;
-      let loaded = 0;
-      data.imageSrcs.forEach(src => {
-        const img = new Image();
-        img.onload = () => {
-          loaded++;
-          if (loaded === data.imageSrcs.length) {
-            map.length = 0;
-            data.map.forEach(row => {
-              map.push(row.map(id => id !== null ? images[id] : null));
-            });
-            drawMap();
-
-            if (data.player) {
-              player.style.left = data.player.left;
-              player.style.top = data.player.top;
-            }
-          }
-        };
-        img.src = src;
-        images.push(img);
-      });
-    };
-    reader.readAsText(file);
-  };
-  input.click();
-}
-  
-  function selectTool(tool) {
-  document.querySelectorAll(".tool-button").forEach(btn => {
-    btn.classList.remove("selected");
-  });
+function selectTool(tool) {
+  document.querySelectorAll(".tool-button").forEach(btn => btn.classList.remove("selected"));
   document.getElementById(tool).classList.add("selected");
   mode = tool;
 }
 
-// Game Loop
+canvas.addEventListener('click', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const x = Math.floor((e.clientX - rect.left) / scale);
+  const y = Math.floor((e.clientY - rect.top) / scale);
+  if (x < cols && y < rows) {
+    if (mode === 'place') {
+      map[y][x] = selectedImage;
+    } else if (mode === 'remove') {
+      map[y][x] = null;
+    }
+    drawMap();
+  }
+});
+
+document.addEventListener('keydown', (e) => keys[e.key] = true);
+document.addEventListener('keyup', (e) => keys[e.key] = false);
+
+window.addEventListener("gamepadconnected", (e) => {
+  gamepadIndex = e.gamepad.index;
+});
+
+function getGamepadInput() {
+  const gp = navigator.getGamepads()[gamepadIndex];
+  if (!gp) return;
+  joyPos.x = gp.axes[0];
+  if (gp.buttons[0].pressed && onGround) isJumping = true;
+}
+
+joystick.addEventListener("touchstart", () => joystickActive = true);
+joystick.addEventListener("touchend", () => {
+  joystickActive = false;
+  joyPos = { x: 0, y: 0 };
+  joystickInner.style.transform = "translate(0, 0)";
+});
+joystick.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const rect = joystick.getBoundingClientRect();
+  const dx = touch.clientX - rect.left - rect.width / 2;
+  const dy = touch.clientY - rect.top - rect.height / 2;
+  joyPos.x = dx / 30;
+  joyPos.y = dy / 30;
+  joystickInner.style.transform = `translate(${dx}px, ${dy}px)`;
+});
+
+document.getElementById("jumpBtn").addEventListener("click", () => {
+  if (onGround) isJumping = true;
+});
+
 function gameLoop() {
   if (gamepadIndex !== null) getGamepadInput();
   updatePlayer();
   requestAnimationFrame(gameLoop);
 }
-  
-  document.getElementById("jumpBtn").addEventListener("click", () => {
-  if (onGround) {
-    isJumping = true;
-  }
-});
-  
-  player.style.left = '100px';
-  player.style.top = '100px';
 
-   gameLoop();
+player.style.left = '100px';
+player.style.top = '100px';
+
+drawMap();
+gameLoop();
+
   </script>
 </body>
-                                   </html>
+</html>
