@@ -17,11 +17,13 @@
       overflow: hidden;
     }
     #canvasContainer {
-      flex: 1;
-      overflow: auto;
-      background-color: #300000;
-      position: relative;
-    }
+  flex: 1;
+  overflow: auto;
+  background-color: #300000;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
     canvas {
       display: block;
       background-color: #1c1c1c;
@@ -101,6 +103,11 @@
     #toolbar button.selected {
       background-color: #ff3333;
     }
+  
+    .tool-button.selected {
+  border: 2px solid orange;
+  background-color: #333;
+}
   </style>
 </head>
 <body>
@@ -112,10 +119,10 @@
       <button onclick="addRow()">Add Row</button>
       <button onclick="addCol()">Add Column</button>
       <button onclick="downloadHTML()">Export Game</button>
-      <button id="placeBtn" onclick="setMode('place')">Place</button>
-      <button id="removeBtn" onclick="setMode('remove')">Remove</button>
-      <button onclick="saveMap()">Save</button>
-      <button onclick="loadMap()">Load</button>
+      <button id="place" class="tool-button" onclick="selectTool('place')">Place</button>
+      <button id="remove" class="tool-button" onclick="selectTool('remove')">Remove</button>
+      <button onclick="saveProject()">Save</button>
+      <button onclick="loadProject()">Load</button>
     </div>
     <div id="library"></div>
     <div id="canvasContainer">
@@ -124,7 +131,7 @@
       <div id="joystick">
         <div id="joystick-inner"></div>
       </div>
-      <button id="jumpBtn">JUMP</button>
+      <button id="jumpBtn" style="position:fixed;bottom:80px;right:20px;">Jump</button>
     </div>
   </div>
   <script>
@@ -229,7 +236,7 @@ c.width=${cols * scale};
 c.height=${rows * scale};
 
 const map=${JSON.stringify(map.map(row => row.map(cell => cell ? images.indexOf(cell) : null)))};
-const imagesSrc=${JSON.stringify(images.map(img => img.src))};
+const imagesSrc=${JSON.stringify(images.map(img => img.src.startsWith("blob:") ? img.src : img.src))};
 
 const blockSize=${scale};
 const images=[];
@@ -290,12 +297,16 @@ function start(){
   );
 
   const project = {
-    map: serializableMap,
-    imageSrcs: images.map(img => img.src),
-    scale,
-    rows,
-    cols
-  };
+  map: serializableMap,
+  imageSrcs: images.map(img => img.src),
+  scale,
+  rows,
+  cols,
+  player: {
+    left: player.style.left,
+    top: player.style.top
+  }
+};
 
   const blob = new Blob([JSON.stringify(project)], { type: "application/octet-stream" });
   const url = URL.createObjectURL(blob);
@@ -332,6 +343,12 @@ function loadMap() {
               map.push(row.map(id => id !== null ? images[id] : null));
             });
             drawMap();
+            
+            if (data.player) {
+  player.style.left = data.player.left;
+  player.style.top = data.player.top;
+}
+            
           }
         };
         img.src = src;
@@ -422,24 +439,33 @@ function updatePlayer() {
   // Gravity
   velocityY += gravity;
 
-  // Update position
+  // Predict new positions
   let newX = player.offsetLeft + velocityX;
   let newY = player.offsetTop + velocityY;
 
-  // Simple floor collision
-  if (newY + player.offsetHeight >= window.innerHeight) {
-    newY = window.innerHeight - player.offsetHeight;
+  // Collision check bottom of player
+  const playerMidX = newX + player.offsetWidth / 2;
+  const playerBottomY = newY + player.offsetHeight;
+
+  if (isColliding(playerMidX, playerBottomY)) {
+    newY = Math.floor(playerBottomY / scale) * scale - player.offsetHeight;
     velocityY = 0;
     onGround = true;
+  } else {
+    onGround = false;
   }
+
+  // Keep player inside canvas
+  newX = Math.max(0, Math.min(canvas.width - player.offsetWidth, newX));
+  newY = Math.max(0, Math.min(canvas.height - player.offsetHeight, newY));
 
   player.style.left = newX + 'px';
   player.style.top = newY + 'px';
 }
   
   // Clamp player within the canvas
-newX = Math.max(0, Math.min(newX, canvas.width - player.offsetWidth));
-newY = Math.max(0, Math.min(newY, canvas.height - player.offsetHeight));
+player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
+player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
 
 // Tile collision
 const playerMidX = newX + player.offsetWidth / 2;
@@ -451,11 +477,106 @@ if (isColliding(playerMidX, playerMidY)) {
   onGround = true;
 }
   
-  document.getElementById("jumpBtn").addEventListener("touchstart", () => {
-  if (onGround) {
-    isJumping = true;
+  document.getElementById("jumpBtn").addEventListener("click", () => {
+  if (player.onGround) {
+    player.vy = -10;
+    player.onGround = false;
   }
 });
+  
+  function checkCollision(x, y) {
+  for (let block of blocks) {
+    if (
+      x < block.x + block.size &&
+      x + player.width > block.x &&
+      y < block.y + block.size &&
+      y + player.height > block.y
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+  
+  function saveProject() {
+  let name = prompt("Enter project name:");
+  if (!name) return;
+
+  const serializableMap = map.map(row =>
+    row.map(cell => cell ? images.indexOf(cell) : null)
+  );
+
+  const project = {
+    map: serializableMap,
+    imageSrcs: images.map(img => img.src),
+    scale,
+    rows,
+    cols,
+    player: {
+      left: player.style.left,
+      top: player.style.top
+    }
+  };
+
+  const blob = new Blob([JSON.stringify(project)], { type: "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.drge2d`;
+  a.click();
+}
+  
+  function loadProject() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".drge2d";
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = JSON.parse(reader.result);
+
+      rows = data.rows;
+      cols = data.cols;
+      scale = data.scale;
+      canvas.width = cols * scale;
+      canvas.height = rows * scale;
+
+      images.length = 0;
+      let loaded = 0;
+      data.imageSrcs.forEach(src => {
+        const img = new Image();
+        img.onload = () => {
+          loaded++;
+          if (loaded === data.imageSrcs.length) {
+            map.length = 0;
+            data.map.forEach(row => {
+              map.push(row.map(id => id !== null ? images[id] : null));
+            });
+            drawMap();
+
+            if (data.player) {
+              player.style.left = data.player.left;
+              player.style.top = data.player.top;
+            }
+          }
+        };
+        img.src = src;
+        images.push(img);
+      });
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+  
+  function selectTool(tool) {
+  document.querySelectorAll(".tool-button").forEach(btn => {
+    btn.classList.remove("selected");
+  });
+  document.getElementById(tool).classList.add("selected");
+  mode = tool;
+}
 
 // Game Loop
 function gameLoop() {
@@ -463,8 +584,17 @@ function gameLoop() {
   updatePlayer();
   requestAnimationFrame(gameLoop);
 }
+  
+  document.getElementById("jumpBtn").addEventListener("click", () => {
+  if (onGround) {
+    isJumping = true;
+  }
+});
+  
+  player.style.left = '100px';
+  player.style.top = '100px';
 
    gameLoop();
   </script>
 </body>
-</html>
+                                   </html>
