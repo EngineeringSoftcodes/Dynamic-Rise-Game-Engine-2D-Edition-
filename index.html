@@ -103,8 +103,8 @@
       <button onclick="downloadHTML()">Export Game</button>
       <button id="placeBtn" onclick="setMode('place')">Place</button>  
       <button id="removeBtn" onclick="setMode('remove')">Remove</button>
-      <button onclick="saveMap()">Save</button>
-      <button onclick="loadMap()">Load</button>
+      <button id="saveBtn">Save Project</button>
+      <button id="loadBtn">Load Project</button>
     </div>
     <div id="library"></div>
     <div id="canvasContainer">
@@ -150,6 +150,252 @@ let joyPos = { x: 0, y: 0 };
 let joystickActive = false;
 let keys = {};
 let gamepadIndex = null;
+  
+  function zoomIn() {
+  scale += 5;
+  canvas.width = cols * scale;
+  canvas.height = rows * scale;
+  drawMap();
+}
+
+function zoomOut() {
+  scale = Math.max(10, scale - 5);
+  canvas.width = cols * scale;
+  canvas.height = rows * scale;
+  drawMap();
+}
+
+function addRow() {
+  map.push(Array(cols).fill(null));
+  rows++;
+  canvas.height = rows * scale;
+  drawMap();
+}
+
+function addCol() {
+  map.forEach(row => row.push(null));
+  cols++;
+  canvas.width = cols * scale;
+  drawMap();
+}
+
+function setMode(newMode) {
+  mode = newMode;
+  document.getElementById('placeBtn').classList.remove('selected');
+  document.getElementById('removeBtn').classList.remove('selected');
+  document.getElementById(newMode + 'Btn').classList.add('selected');
+}
+
+function saveMap() {
+  const name = prompt("Enter name to save project:", "myProject");
+  if (!name) return;
+  const project = {
+    map: map.map(row => row.map(cell => cell ? cell.src : null)),
+    images: images.map(img => img.src)
+  };
+  const blob = new Blob([JSON.stringify(project)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name + '.drge2d';
+  a.click();
+}
+
+function loadMap() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.drge2d';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = JSON.parse(reader.result);
+      const loadedImages = [];
+      let loadedCount = 0;
+      data.images.forEach(src => {
+        const img = new Image();
+        img.onload = () => {
+          loadedImages.push(img);
+          loadedCount++;
+          if (loadedCount === data.images.length) {
+            images.length = 0;
+            images.push(...loadedImages);
+            updateLibrary();
+            map = data.map.map(row => row.map(src => {
+              if (!src) return null;
+              const found = images.find(i => i.src === src);
+              return found || null;
+            }));
+            rows = map.length;
+            cols = map[0].length;
+            canvas.width = cols * scale;
+            canvas.height = rows * scale;
+            drawMap();
+          }
+        };
+        img.src = src;
+      });
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+  
+  // 🧠 Store editor data as project object
+let projectData = {
+  projectName: "Untitled",
+  map: [], // store tile positions/types etc
+  otherData: {} // you can add more here later
+};
+
+// 🔘 Save project with name input
+function saveProject() {
+  const projectName = prompt("Enter project name:", projectData.projectName);
+  if (!projectName) return;
+  projectData.projectName = projectName;
+
+  const data = JSON.stringify(projectData);
+  const blob = new Blob([data], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${projectName}.drge2d`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// 🔘 Load project
+function loadProject(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      projectData = data;
+      alert("Project loaded: " + projectData.projectName);
+      // TODO: Restore the map and other things visually
+    } catch (err) {
+      alert("Invalid project file!");
+    }
+  };
+  reader.readAsText(file);
+}
+
+// 👇 Add this once in your HTML (where buttons live)
+const loadInput = document.createElement("input");
+loadInput.type = "file";
+loadInput.accept = ".drge2d";
+loadInput.style.display = "none";
+loadInput.addEventListener("change", loadProject);
+document.body.appendChild(loadInput);
+
+// Bind buttons (somewhere after DOM is loaded)
+document.getElementById("saveBtn").onclick = saveProject;
+document.getElementById("loadBtn").onclick = () => loadInput.click();
+  
+  function downloadHTML() {
+  let blockData = JSON.stringify(map.map(row => row.map(cell => cell ? cell.src : null)));
+  let imageData = JSON.stringify(images.map(img => img.src));
+
+  const htmlContent = `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <title>Exported Game</title>
+    <style>
+      body { margin:0; background:#000; }
+      canvas { display:block; margin:auto; background:#111; }
+      #player { position:absolute; width:30px; height:30px; background:red; }
+    </style>
+  </head>
+  <body>
+    <canvas id="gameCanvas" width="${cols * scale}" height="${rows * scale}"></canvas>
+    <div id="player" style="left:100px;top:100px;"></div>
+    <script>
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+      const scale = ${scale};
+      const map = ${blockData};
+      const images = [];
+      const imageSources = ${imageData};
+      const player = document.getElementById('player');
+      let velocityY = 0, gravity = 1, onGround = false, isJumping = false;
+
+      function loadImages(callback) {
+        let loaded = 0;
+        imageSources.forEach((src, i) => {
+          const img = new Image();
+          img.onload = () => {
+            images[i] = img;
+            loaded++;
+            if (loaded === imageSources.length) callback();
+          };
+          img.src = src;
+        });
+      }
+
+      function drawMap() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        for (let y = 0; y < map.length; y++) {
+          for (let x = 0; x < map[y].length; x++) {
+            const src = map[y][x];
+            if (src) {
+              const img = images.find(i => i.src.includes(src));
+              if (img) ctx.drawImage(img, x * scale, y * scale, scale, scale);
+            }
+          }
+        }
+      }
+
+      function isColliding(x, y) {
+        const col = Math.floor(x / scale);
+        const row = Math.floor(y / scale);
+        return map[row] && map[row][col] !== null;
+      }
+
+      function updatePlayer() {
+        let newX = player.offsetLeft;
+        let newY = player.offsetTop + velocityY;
+
+        const midX = newX + 15;
+        const bottomY = newY + 30;
+
+        if (isColliding(midX, bottomY)) {
+          newY = Math.floor(bottomY / scale) * scale - 30;
+          velocityY = 0;
+          onGround = true;
+        } else {
+          onGround = false;
+        }
+
+        velocityY += gravity;
+
+        player.style.top = newY + 'px';
+      }
+
+      function loop() {
+        updatePlayer();
+        requestAnimationFrame(loop);
+      }
+
+      loadImages(() => {
+        drawMap();
+        loop();
+      });
+    <\/script>
+  </body>
+  </html>
+  `;
+
+  const blob = new Blob([htmlContent], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'exported_game.html';
+  a.click();
+}
 
 function updateLibrary() {
   const library = document.getElementById('library');
@@ -302,4 +548,4 @@ gameLoop();
 
   </script>
 </body>
-</html>
+  </html>
